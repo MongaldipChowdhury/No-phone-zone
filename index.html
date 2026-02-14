@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>No Phone Zone</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.0.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    body {
+      text-align: center;
+      background: black;
+      color: white;
+      font-family: Arial;
+    }
+    video, canvas {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #canvas {
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+
+<h1>No Phone Zone</h1>
+
+<video id="video" width="640" height="480" autoplay></video>
+<canvas id="canvas" width="640" height="480"></canvas>
+<audio id="alertSound" src="audio.mp3"></audio>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const alertSound = document.getElementById('alertSound');
+
+let model;
+let lastAlertTime = 0;
+const COOLDOWN = 11000; // 11 seconds
+
+async function setupCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+  return new Promise(resolve => {
+    video.onloadedmetadata = () => resolve(video);
+  });
+}
+
+async function detectFrame() {
+  const predictions = await model.detect(video);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  predictions.forEach(prediction => {
+    if (prediction.class === "cell phone") {
+      const [x, y, width, height] = prediction.bbox;
+
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x, y, width, height);
+
+      ctx.fillStyle = "red";
+      ctx.font = "20px Arial";
+      ctx.fillText("PHONE RAKHHHH NEECHE!", x, y - 10);
+
+      const now = Date.now();
+      if (now - lastAlertTime > COOLDOWN) {
+        alertSound.play();
+        lastAlertTime = now;
+      }
+    }
+  });
+
+  requestAnimationFrame(detectFrame);
+}
+
+async function main() {
+  await setupCamera();
+  model = await cocoSsd.load();
+  detectFrame();
+}
+
+main();
+</script>
+
+</body>
+</html>
