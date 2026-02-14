@@ -1,70 +1,112 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>No Phone Zone</title>
+
+  <!-- TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.0.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
   <style>
     body {
-      text-align: center;
+      margin: 0;
+      overflow: hidden;
       background: black;
-      color: white;
-      font-family: Arial;
+      font-family: Arial, sans-serif;
     }
-    video, canvas {
+
+    h1 {
       position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      z-index: 3;
+      font-size: 22px;
+      text-shadow: 0 0 10px red;
     }
-    #canvas {
-      z-index: 2;
+
+    video, canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
     }
+
+    video { z-index: 1; }
+    canvas { z-index: 2; }
   </style>
 </head>
+
 <body>
 
-<h1>No Phone Zone</h1>
-  <h2>By Mongaldip</h2>
+<h1>🚫 No Phone Zone 🚫</h1>
 
-<video id="video" width="640" height="480" autoplay></video>
-<canvas id="canvas" width="640" height="480"></canvas>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
 <audio id="alertSound" src="audio.mp3"></audio>
 
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const alertSound = document.getElementById('alertSound');
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const alertSound = document.getElementById("alertSound");
 
 let model;
 let lastAlertTime = 0;
-const COOLDOWN = 11000; // 11 seconds
+const COOLDOWN = 11000; // 11 seconds cooldown
+const CONFIDENCE = 0.6;
 
+// Canvas resize function
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+// Setup camera
 async function setupCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: "environment"
+    },
+    audio: false
+  });
   video.srcObject = stream;
   return new Promise(resolve => {
-    video.onloadedmetadata = () => resolve(video);
+    video.onloadedmetadata = () => {
+      video.play();
+      resolve();
+    };
   });
 }
 
+// Detection loop
 async function detectFrame() {
   const predictions = await model.detect(video);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   predictions.forEach(prediction => {
-    if (prediction.class === "cell phone") {
+    if (prediction.class === "cell phone" && prediction.score > CONFIDENCE) {
+
       const [x, y, width, height] = prediction.bbox;
 
+      // Draw red box
       ctx.strokeStyle = "red";
       ctx.lineWidth = 4;
       ctx.strokeRect(x, y, width, height);
 
+      // Draw text
       ctx.fillStyle = "red";
-      ctx.font = "20px Arial";
-      ctx.fillText("PHONE RAKHHHH NEECHE!", x, y - 10);
+      ctx.font = "bold 24px Arial";
+      ctx.fillText("PHONE RAKHHH NEECHE!", x, y - 10);
 
+      // Cooldown audio
       const now = Date.now();
       if (now - lastAlertTime > COOLDOWN) {
         alertSound.play();
@@ -76,9 +118,11 @@ async function detectFrame() {
   requestAnimationFrame(detectFrame);
 }
 
+// Main function
 async function main() {
   await setupCamera();
   model = await cocoSsd.load();
+  console.log("Model Loaded");
   detectFrame();
 }
 
